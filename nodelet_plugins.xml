@@ -1,0 +1,7 @@
+<library path="lib/libcluster_extraction">
+  <class name="cluster_extraction/ClusterExtraction" type="cluster_extraction::ClusterExtraction" base_class_type="nodelet::Nodelet">
+  	<description>
+  		A Nodelet to extract Euclidean clusters from a pointcloud and publish their sizes and centroids as a doro_msgs/Clusters message.
+  	 </description>
+  </class>
+</library>
