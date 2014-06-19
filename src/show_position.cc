@@ -47,11 +47,12 @@ void position_callback(const visualization_msgs::MarkerConstPtr& in_msg)
 	geometry_msgs::PointStamped p_final, p;
 	
 	p.header.stamp = in_msg->header.stamp;
-	p.header.frame_id = in_msg->header.frame_id;
-	// p.point = in_msg->pose.position;
-	p.point.x = in_msg->pose.position.z - 0.25;
-	p.point.y = -1 * in_msg->pose.position.y ;
-	p.point.z = in_msg->pose.position.x;
+	p.header.frame_id = "LeftCameraLens_link";
+	p.point = in_msg->pose.position;
+	
+	p.point.z = in_msg->pose.position.z - 0.3;
+	//p.point.y = -1 * in_msg->pose.position.y ;
+	//p.point.z = in_msg->pose.position.x;
 
 	tf_listener->waitForTransform ("base_link", p.header.frame_id, p.header.stamp, ros::Duration(2));
 	try

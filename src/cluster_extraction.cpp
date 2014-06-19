@@ -361,13 +361,14 @@ void ClusterExtraction::processCloud()
 
 	    	printf("**************************\n");
 	    	printf("CLUSTER: %d\n",j);
-	    	printf("Cluster has %d cylinder(s).\n", getCylinders(cloud_cluster) );
-	    	printf("Cluster has %d planes(s).\n", getPlanes(cloud_cluster) );
+	    	//printf("Cluster has %d cylinder(s).\n", getCylinders(cloud_cluster) );
+	    	//printf("Cluster has %d planes(s).\n", getPlanes(cloud_cluster) );
 	    	printf("**************************\n");
 	    	j++;
 	    }
 
 	}
+
 	clusters_pub.publish(clusters);
 	}
 
