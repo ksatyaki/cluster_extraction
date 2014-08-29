@@ -16,28 +16,29 @@ namespace cluster_extraction
 
 ClusterExtraction::ClusterExtraction()
 {
-	// TODO Auto-generated constructor stub
 
 }
+
 
 ClusterExtraction::~ClusterExtraction()
 {
 
+	filtered_cloud_pub.shutdown();
+	table_position_pub.shutdown();
+	table_cloud_pub.shutdown();
+	clusters_pub.shutdown();
+
+	cloud_sub.shutdown();
 }
 
 void ClusterExtraction::onInit()
 {
-	bool cluster_extraction_enable;
 	ros::NodeHandle nh;
+	ros::CallbackQueue q;
 
-	bool hasparam = nh.getParam("/cluster_extraction_enable", cluster_extraction_enable);
+	nh.setCallbackQueue(&q);
 
-	if(!hasparam || ( hasparam && !cluster_extraction_enable) )
-	{
-		NODELET_INFO("NOTE: The Parameter /cluster_extraction_enable was not set to true. Default value is 'false'. Cloud will not be processed.");
-	}
-
-	else NODELET_INFO("Cluster Extraction has started!");
+	NODELET_INFO("Cluster Extraction has started!");
 
 	tf_listener = new tf::TransformListener(nh, ros::Duration(10));
 	
@@ -49,38 +50,54 @@ void ClusterExtraction::onInit()
 
 	//table_coeffs_pub = nh.advertise<pcl_msgs::ModelCoefficients> ("/table_coeffs", 1);
 
-	clusters_pub = nh.advertise<doro_msgs::Clusters> ("/clusters", 1);
+	clusters_pub = nh.advertise<doro_msgs::ClusterArray> ("/clusters", 1);
 
 	cloud_sub = nh.subscribe("/xtion_camera/depth/points", 10 , &ClusterExtraction::cloudCallback, this);
 
+	bool cluster_extraction_enable_param = false;
+
 	while(ros::ok())
 	{
-		ros::spinOnce();
-		processCloud();
+		ros::param::get("/cluster_extraction_enable", cluster_extraction_enable_param);
+		if(cluster_extraction_enable_param)
+		{
+			q.callOne(ros::WallDuration(1.0));
+			processCloud();
+		}
+		else
+		{
+			ROS_INFO("Parameter not set. No extraction will take place.");
+			sleep(1);
+		}
 	}
 
 }
 
 void ClusterExtraction::cloudCallback(const sensor_msgs::PointCloud2ConstPtr& _cloud)
 {
-	bool cluster_extraction_enable = false, plane_extraction_enable = false;
-	bool has_cluster_param = ros::param::get("/cluster_extraction_enable", cluster_extraction_enable);
-	bool has_plane_param = ros::param::get("/plane_extraction_enable", plane_extraction_enable);
+	//bool cluster_extraction_enable = false, plane_extraction_enable = false;
+	//bool has_cluster_param = ros::param::get("/cluster_extraction_enable", cluster_extraction_enable);
+	//bool has_plane_param = ros::param::get("/plane_extraction_enable", plane_extraction_enable);
 
-	if( (has_cluster_param && cluster_extraction_enable) || (has_plane_param && plane_extraction_enable) )
-	{
+	//if( (has_cluster_param && cluster_extraction_enable) || (has_plane_param && plane_extraction_enable) )
+	//{
 		// Convert the ROS message to a pcl point cloud (templated) type.
-		pcl_data = pcl::PointCloud<PoinT>::Ptr(new pcl::PointCloud<PoinT>);
-		pcl::fromROSMsg (*_cloud, *pcl_data);
-	}
+	pcl_data = pcl::PointCloud<PoinT>::Ptr(new pcl::PointCloud<PoinT>);
+	stamp_ = _cloud->header.stamp;
+	pcl::fromROSMsg (*_cloud, *pcl_data);
 
-	else
-		if(pcl_data)
-			pcl_data.reset();
+	ROS_INFO("CALLED BACK");
+	//}
+
+	//else
+		//if(pcl_data)
+			//pcl_data.reset();
 }
 
 void ClusterExtraction::processCloud()
 {
+	ros::Time stamp = ros::Time::now();
+
 	if(!pcl_data)
 	{
 		ROS_INFO("No data. Either the parameters are not set. Or there is a problem.");
@@ -88,38 +105,44 @@ void ClusterExtraction::processCloud()
 		return;
 	}
 
-	bool cluster_extraction_enable = false, plane_extraction_enable = false;
-	bool has_cluster_param = ros::param::get("/cluster_extraction_enable", cluster_extraction_enable);
-	bool has_plane_param = ros::param::get("/plane_extraction_enable", plane_extraction_enable);
+	pcl::PointCloud<PoinT>::Ptr _cloud;// (new pcl::PointCloud<PoinT>);
+	_cloud = pcl_data;
 
-	// Make a copy of the class' data and then use it. Because a callback may occur as we are processing.
 
-	pcl::PointCloud<PoinT>::Ptr _cloud (new pcl::PointCloud<PoinT>);
-	*_cloud = *pcl_data;
+	/**********************************************
+	 * NEW BULL
+	 *********************************************/
 
-	ros::Time stamp = ros::Time::now();
-
-	pcl::VoxelGrid<PoinT> vg;
-	pcl::PointCloud<PoinT>::Ptr cloud_filtered (new pcl::PointCloud<PoinT>);
-	vg.setInputCloud (_cloud);
-	vg.setLeafSize (0.01f, 0.01f, 0.01f);
-	vg.filter (*cloud_filtered);
-
-	*_cloud = *cloud_filtered;
+	//////////////////////////////////////////////////////////////////////
+	// Cluster Extraction
+	// Creating the KdTree object for the search method of the extraction
 
 	// Findout the points that are more than 1.25 m away.
 	pcl::PointIndices::Ptr out_of_range_points (new pcl::PointIndices);
-	int i = 0;
+	unsigned int i = 0;
+	BOOST_FOREACH(PoinT& pt, _cloud->points)
+	{
+		int ind[2];
+		ind[0] = i;
+		//% _cloud->width;
+		ind[1] = (i - ind[0])/ _cloud->width;
+
+		memcpy(&pt.data[3], ind, 4);
+
+		//pt.data_c[0] = _index.value;
+		i++;
+	}
+
+	i = 0;
+
 	BOOST_FOREACH(const PoinT& pt, _cloud->points)
 	{
-	  if(sqrt( (pt.x*pt.x) + (pt.y*pt.y) + (pt.z*pt.z) ) > 1.25)
-		  out_of_range_points->indices.push_back(i);
+		if(sqrt( (pt.x*pt.x) + (pt.y*pt.y) + (pt.z*pt.z) ) > 1.25 || isnan (pt.x) || isnan (pt.y) || isnan (pt.z) ||
+				  isinf (pt.x) || isinf (pt.y) || isinf (pt.z) )
+			out_of_range_points->indices.push_back(i);
 
-	  //else if(isnan (pt.x) || isnan (pt.y) || isnan (pt.z) ||
-		//	   isinf (pt.x) || isinf (pt.y) || isinf (pt.z) )
-		//  out_of_range_points->indices.push_back(i);
+		i++;
 
-	  i++;
 	}
 
 	pcl::ExtractIndices<PoinT> extract;
@@ -131,7 +154,7 @@ void ClusterExtraction::processCloud()
 	extract.setNegative (true);
 	extract.filter (*cloud);
 
-	filtered_cloud_pub.publish(cloud);
+
 
 	// Prepare plane segmentation.
 	pcl::SACSegmentation<PoinT> seg;
@@ -153,7 +176,8 @@ void ClusterExtraction::processCloud()
 
 	int nr_points =  (int) cloud->points.size();
 
-	while (cloud->points.size () > 0.4 * nr_points)
+
+	while (cloud->points.size () > 0.5 * nr_points)
 	{
 		seg.setInputCloud (cloud);
 		seg.segment (*inliers, *coefficients);
@@ -170,18 +194,20 @@ void ClusterExtraction::processCloud()
 		extract.setNegative (false);
 		extract.filter (*cloud_f);
 
+
 		// Is this a parallel to ground plane? If yes, save it.
 		geometry_msgs::PointStamped plane_normal;
 		plane_normal.point.x = coefficients->values[0];
 		plane_normal.point.y = coefficients->values[1];
 		plane_normal.point.z = coefficients->values[2];
-		plane_normal.header.frame_id = cloud->header.frame_id;
+		plane_normal.header.frame_id = _cloud->header.frame_id;
 		plane_normal.header.stamp = stamp;
 
 		geometry_msgs::PointStamped _plane_normal; // In the base link frame.
 
 		try
 		{
+			tf_listener->waitForTransform("base_link", plane_normal.header.frame_id, plane_normal.header.stamp, ros::Duration(1));
 			tf_listener->transformPoint("base_link", plane_normal, _plane_normal);
 		}
 		catch(tf::TransformException& ex)
@@ -200,6 +226,7 @@ void ClusterExtraction::processCloud()
 			*cloud_plane = *cloud_f;
 		}
 
+
 		extract.setNegative (true);
 		extract.filter (*cloud_f);
 		*cloud = *cloud_f;
@@ -212,6 +239,7 @@ void ClusterExtraction::processCloud()
 		return;
 	}
 
+	ROS_INFO("Table seen.");
 	table_cloud_pub.publish(cloud_plane);
 
     //////////////////////////////////////////////////////////////////////
@@ -226,24 +254,9 @@ void ClusterExtraction::processCloud()
     plane_centroid.header.frame_id = cloud->header.frame_id;
     plane_centroid.header.stamp = stamp;
 
-/*
-    // Centroid computation.
-    BOOST_FOREACH(PoinT p, cloud_plane->points)
-    {
-    	if(isnan(p.x) || isnan(p.y) || isnan(p.z))
-    		continue;
-    	plane_centroid.point.x += p.x;
-    	plane_centroid.point.y += p.y;
-    	plane_centroid.point.z += p.z;
-    }
-
-    plane_centroid.point.x = plane_centroid.point.x/ (double) ((cloud_plane->points).size());
-    plane_centroid.point.y = plane_centroid.point.y/ (double) ((cloud_plane->points).size());
-    plane_centroid.point.z = plane_centroid.point.z/ (double) ((cloud_plane->points).size());
-
-    */
     Eigen::Vector4f plane_cen;
 
+    // REMOVE COMMENTS WITH REAL ROBOT!!!
     pcl::compute3DCentroid(*cloud_plane, plane_cen);
 
     plane_centroid.point.x = plane_cen[0];
@@ -253,124 +266,112 @@ void ClusterExtraction::processCloud()
     std::cout<< plane_cen;
 
     geometry_msgs::PointStamped _plane_centroid, _plane_normal;
+
     try
     {
     	tf_listener->waitForTransform("base_link", plane_centroid.header.frame_id, plane_centroid.header.stamp, ros::Duration(1));
     	tf_listener->transformPoint("base_link", plane_centroid, _plane_centroid);
     }
+
     catch(tf::TransformException& ex)
     {
     	ROS_INFO("COCKED UP POINT INFO! Why: %s", ex.what());
     }
 
+    // Publish the centroid.
+    table_position_pub.publish(_plane_centroid);
 
-    if((has_plane_param) && (plane_extraction_enable))
-    {
-    	// Publish the centroid.
-    	table_position_pub.publish(_plane_centroid);
-    }
+   	pcl::search::KdTree<PoinT>::Ptr tree (new pcl::search::KdTree<PoinT>);
+   	tree->setInputCloud (cloud);
 
-    ////////////////////////////////////////////////////////////////////
-    //////////////////////////// NAN FILTER ////////////////////////////
-    ////////////////////////////////////////////////////////////////////
+   	std::vector<pcl::PointIndices> cluster_indices;
+   	pcl::EuclideanClusterExtraction<PoinT> ec;
+   	ec.setClusterTolerance (0.05); // 2cm
+   	ec.setMinClusterSize (1500);
+   	ec.setMaxClusterSize (25000);
+   	ec.setSearchMethod (tree);
+   	ec.setInputCloud (cloud);
 
-    pcl::PointIndices::Ptr nan_points (new pcl::PointIndices);
-    i = 0;
-    BOOST_FOREACH(const PoinT& pt, cloud->points)
-    {
+   	ec.extract (cluster_indices);
 
-      if(isnan (pt.x) || isnan (pt.y) || isnan (pt.z) ||
-    	  isinf (pt.x) || isinf (pt.y) || isinf (pt.z) )
-    	  nan_points->indices.push_back(i);
-   	  i++;
+   	//ROS_INFO("WIDTH: %d, HEIGHT: %d\n", _cloud->width, _cloud->height);
+
+   	//ROS_INFO("GOOD TILL HERE!");
+
+   	double ourx = 0.0, oury = 0.0;
+
+   	int j = 0;
+   	doro_msgs::ClusterArray __clusters;
+
+   	for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
+   	{
+   		ourx = 0.0, oury = 0.0;
+
+   		//printf("WORLDSUCKS");
+   		pcl::PointCloud<PoinT>::Ptr cloud_cluster (new pcl::PointCloud<PoinT>);
+   		for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); pit++)
+   		{
+   			cloud_cluster->points.push_back (cloud->points[*pit]);
+   			int indices[2];
+   			memcpy(indices, &cloud->points[*pit].data[3], 4);
+
+   			int oh_x = indices[0] % 640;
+   			ourx += oh_x;
+   			oury += (indices[0] - oh_x) / 640;
+   		}
+
+   		ourx = ourx / (double) cloud_cluster->points.size ();
+   		oury = oury / (double) cloud_cluster->points.size ();
+
+   		cloud_cluster->width = cloud_cluster->points.size ();
+   		cloud_cluster->height = 1;
+   		cloud_cluster->is_dense = true;
+   		cloud_cluster->header.frame_id = cloud->header.frame_id;
+
+   		geometry_msgs::PointStamped cluster_centroid;
+   		cluster_centroid.point.x = 0.0;
+   		cluster_centroid.point.y = 0.0;
+   		cluster_centroid.point.z = 0.0;
+   		cluster_centroid.header.frame_id = cloud_cluster->header.frame_id;
+   		cluster_centroid.header.stamp = stamp;
+
+   		Eigen::Vector4f cluster_cen;
+
+   		pcl::compute3DCentroid(*cloud_cluster, cluster_cen);
+
+   		cluster_centroid.point.x = cluster_cen[0];
+   		cluster_centroid.point.y = cluster_cen[1];
+   		cluster_centroid.point.z = cluster_cen[2];
+
+   		geometry_msgs::PointStamped _cluster_centroid;
+
+   		try
+   		{
+   			tf_listener->waitForTransform("base_link", cluster_centroid.header.frame_id, cluster_centroid.header.stamp, ros::Duration(1));
+   			tf_listener->transformPoint("base_link", cluster_centroid, _cluster_centroid);
+   		}
+   		catch(tf::TransformException& ex)
+   		{
+   			ROS_INFO("COCKED UP POINT INFO! Why: %s", ex.what());
+   		}
+
+
+   		if(DIST(cluster_centroid.point,plane_centroid.point) < 0.3)
+   		{
+   			doro_msgs::Cluster __cluster;
+   			__cluster.centroid = _cluster_centroid;
+   			__cluster.cluster_size = cloud_cluster->width * cluster_centroid.point.z;
+   			__cluster.x = ourx;
+   			__cluster.y = oury;
+   			__clusters.clusters.push_back (__cluster);
+   			j++;
+   		}
+
    	}
 
-   	// Perform the extraction of these points (indices).
-   	extract.setInputCloud(cloud);
-   	extract.setIndices(nan_points);
-   	extract.setNegative (true);
-   	extract.filter (*cloud);
+   	clusters_pub.publish(__clusters);
 
-    //////////////////////////////////////////////////////////////////////
-
-    if(has_cluster_param && cluster_extraction_enable)
-    {
-	// Cluster Extraction
-	// Creating the KdTree object for the search method of the extraction
-	pcl::search::KdTree<PoinT>::Ptr tree (new pcl::search::KdTree<PoinT>);
-	tree->setInputCloud (cloud);
-
-
-	std::vector<pcl::PointIndices> cluster_indices;
-	pcl::EuclideanClusterExtraction<PoinT> ec;
-	ec.setClusterTolerance (0.02); // 2cm
-	ec.setMinClusterSize (50);
-	ec.setMaxClusterSize (25000);
-	ec.setSearchMethod (tree);
-	ec.setInputCloud (cloud);
-
-	ROS_INFO("GOOD TILL HERE!");
-	ec.extract (cluster_indices);
-
-	ROS_INFO("GOOD TILL HERE!");
-
-	int j = 0;
-	doro_msgs::Clusters clusters;
-
-	for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
-	{
-		pcl::PointCloud<PoinT>::Ptr cloud_cluster (new pcl::PointCloud<PoinT>);
-		for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); pit++)
-			cloud_cluster->points.push_back (cloud->points[*pit]); //*
-
-		cloud_cluster->width = cloud_cluster->points.size ();
-	    cloud_cluster->height = 1;
-	    cloud_cluster->is_dense = true;
-	    cloud_cluster->header.frame_id = cloud->header.frame_id;
-
-	    geometry_msgs::PointStamped cluster_centroid;
-	    cluster_centroid.point.x = 0.0;
-	    cluster_centroid.point.y = 0.0;
-	    cluster_centroid.point.z = 0.0;
-	    cluster_centroid.header.frame_id = cloud_cluster->header.frame_id;
-	    cluster_centroid.header.stamp = stamp;
-
-	    Eigen::Vector4f cluster_cen;
-
-	    pcl::compute3DCentroid(*cloud_cluster, cluster_cen);
-
-	    cluster_centroid.point.x = cluster_cen[0];
-	    cluster_centroid.point.y = cluster_cen[1];
-	    cluster_centroid.point.z = cluster_cen[2];
-
-	    geometry_msgs::PointStamped _cluster_centroid;
-	    try
-	    {
-	       	tf_listener->waitForTransform("base_link", cluster_centroid.header.frame_id, cluster_centroid.header.stamp, ros::Duration(1));
-	       	tf_listener->transformPoint("base_link", cluster_centroid, _cluster_centroid);
-	    }
-	    catch(tf::TransformException& ex)
-	    {
-	      	ROS_INFO("COCKED UP POINT INFO! Why: %s", ex.what());
-	    }
-
-	    if(DIST(cluster_centroid.point,plane_centroid.point) < 0.3)
-	    {
-	    	clusters.cluster_centroids.push_back (_cluster_centroid);
-	    	clusters.cluster_sizes.push_back (cloud_cluster->width);
-
-	    	printf("**************************\n");
-	    	printf("CLUSTER: %d\n",j);
-	    	//printf("Cluster has %d cylinder(s).\n", getCylinders(cloud_cluster) );
-	    	//printf("Cluster has %d planes(s).\n", getPlanes(cloud_cluster) );
-	    	printf("**************************\n");
-	    	j++;
-	    }
-
-	}
-
-	clusters_pub.publish(clusters);
-	}
+   	/////////////// RUBBISH ENDS ////////////////
 
     if(pcl_data)
     	pcl_data.reset();

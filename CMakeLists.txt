@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
 )
 
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -108,6 +109,7 @@ include_directories(
 
 ## Declare a cpp executable
 add_executable(show_position_node src/show_position.cc)
+#add_executable(test_pcl src/test.cc)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -121,6 +123,10 @@ target_link_libraries(cluster_extraction
 target_link_libraries(show_position_node
   ${catkin_LIBRARIES}
 )
+
+#target_link_libraries(test_pcl
+#  ${catkin_LIBRARIES}
+#)
 
 #############
 ## Install ##

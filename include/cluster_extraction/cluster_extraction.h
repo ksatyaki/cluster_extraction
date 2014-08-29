@@ -5,6 +5,7 @@
  *      Author: ace
  */
 
+
 #ifndef CLUSTER_EXTRACTION_H_
 #define CLUSTER_EXTRACTION_H_
 
@@ -28,7 +29,7 @@
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/common/centroid.h>
 
-#include <doro_msgs/Clusters.h>
+#include <doro_msgs/ClusterArray.h>
 
 #define DIST(A, B) sqrt ( ((A.x-B.x)*(A.x-B.x)) + ((A.y-B.y)*(A.y-B.y)) + ((A.z-B.z)*(A.z-B.z)) )
 
@@ -36,6 +37,12 @@ typedef pcl::PointXYZ PoinT;
 
 namespace cluster_extraction
 {
+
+union d_in_f
+{
+	double value;
+	int ind[2];
+};
 
 /**
  * The class for cluster extraction nodelet.
@@ -50,6 +57,11 @@ protected:
 	 * A Listener for transforms.
 	 */
 	tf::TransformListener *tf_listener;
+
+	/**
+	 * Time stamp for the latest data.
+	 */
+	ros::Time stamp_;
 
 	/**
 	 * ROS Publisher for publishing the points message.
