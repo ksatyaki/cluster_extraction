@@ -113,7 +113,7 @@ add_executable(show_position_node src/show_position.cc)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-# add_dependencies(cluster_extraction_node cluster_extraction_generate_messages_cpp)
+add_dependencies(cluster_extraction doro_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(cluster_extraction
