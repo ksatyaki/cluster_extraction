@@ -5,6 +5,7 @@
  *      Author: ace
  */
 
+
 #ifndef CLUSTER_EXTRACTION_H_
 #define CLUSTER_EXTRACTION_H_
 
@@ -26,11 +27,22 @@
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_clusters.h>
+#include <pcl/common/centroid.h>
 
-#include <doro_msgs/Clusters.h>
+#include <doro_msgs/ClusterArray.h>
+
+#define DIST(A, B) sqrt ( ((A.x()-B.x())*(A.x()-B.x())) + ((A.y()-B.y())*(A.y()-B.y())) + ((A.z()-B.z())*(A.z()-B.z())) )
+
+typedef pcl::PointXYZ PoinT;
 
 namespace cluster_extraction
 {
+
+union d_in_f
+{
+	double value;
+	int ind[2];
+};
 
 /**
  * The class for cluster extraction nodelet.
@@ -47,6 +59,11 @@ protected:
 	tf::TransformListener *tf_listener;
 
 	/**
+	 * Time stamp for the latest data.
+	 */
+	ros::Time stamp_;
+
+	/**
 	 * ROS Publisher for publishing the points message.
 	 */
 	ros::Publisher centroid_pub;
@@ -59,7 +76,7 @@ protected:
 	/**
 	 * ROS Publisher for the model coefficients of the table.
 	 */
-	ros::Publisher table_coeffs_pub;
+	//ros::Publisher table_coeffs_pub;
 
 	/**
 	 * ROS Publisher that publishes the centroid and size of clusters.
@@ -72,8 +89,19 @@ protected:
 	ros::Subscriber cloud_sub;
 	
 	/** 
-	 * ROS Publisher for the filtered cloud to be used by Moveit
+	 * ROS Publisher for the filtered cloud to be used by Moveit.
 	 */
+	 ros::Publisher filtered_cloud_pub;
+
+	 /**
+	  * Visualize the table.
+	  */
+	 ros::Publisher table_cloud_pub;
+
+	 /**
+	  * A templated point cloud type to hold the data.
+	  */
+	 pcl::PointCloud<PoinT>::Ptr pcl_data;
 
 public:
 	ClusterExtraction();
@@ -88,6 +116,22 @@ public:
 	 * Callback for the point cloud data.
 	 */
 	void cloudCallback(const sensor_msgs::PointCloud2ConstPtr& _cloud);
+
+	/**
+	 * The function where the point cloud is processed.
+	 */
+	void processCloud();
+
+	/**
+	 * Return the number of planes detected.
+	 */
+	int getPlanes(const pcl::PointCloud<PoinT>::ConstPtr& _cloud);
+
+	/**
+	 * Return the number of cylinders detected.
+	 */
+	int getCylinders(const pcl::PointCloud<PoinT>::ConstPtr& _cloud);
+
 };
 } // namespace cluster_extraction
 #endif /* CLUSTER_EXTRACTION_H_ */

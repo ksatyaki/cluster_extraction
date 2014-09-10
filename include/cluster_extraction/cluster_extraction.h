@@ -31,7 +31,7 @@
 
 #include <doro_msgs/ClusterArray.h>
 
-#define DIST(A, B) sqrt ( ((A.x-B.x)*(A.x-B.x)) + ((A.y-B.y)*(A.y-B.y)) + ((A.z-B.z)*(A.z-B.z)) )
+#define DIST(A, B) sqrt ( ((A.x()-B.x())*(A.x()-B.x())) + ((A.y()-B.y())*(A.y()-B.y())) + ((A.z()-B.z())*(A.z()-B.z())) )
 
 typedef pcl::PointXYZ PoinT;
 

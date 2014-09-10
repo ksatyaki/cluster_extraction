@@ -155,7 +155,6 @@ void ClusterExtraction::processCloud()
 	extract.filter (*cloud);
 
 
-
 	// Prepare plane segmentation.
 	pcl::SACSegmentation<PoinT> seg;
 	pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
@@ -175,6 +174,18 @@ void ClusterExtraction::processCloud()
 	i = 0;
 
 	int nr_points =  (int) cloud->points.size();
+	tf::StampedTransform base_link_to_openni;
+	
+	try
+	{
+		tf_listener->waitForTransform("base_link", cloud->header.frame_id, ros::Time(0), ros::Duration(1));
+		//tf_listener->transformPoint("base_link", plane_normal, _plane_normal);
+		tf_listener->lookupTransform("base_link", cloud->header.frame_id, ros::Time(0), base_link_to_openni);
+	}
+	catch(tf::TransformException& ex)
+	{
+	  	ROS_INFO("COCKED UP POINT INFO! Why: %s", ex.what());
+	}
 
 
 	while (cloud->points.size () > 0.5 * nr_points)
@@ -196,28 +207,11 @@ void ClusterExtraction::processCloud()
 
 
 		// Is this a parallel to ground plane? If yes, save it.
-		geometry_msgs::PointStamped plane_normal;
-		plane_normal.point.x = coefficients->values[0];
-		plane_normal.point.y = coefficients->values[1];
-		plane_normal.point.z = coefficients->values[2];
-		plane_normal.header.frame_id = _cloud->header.frame_id;
-		plane_normal.header.stamp = stamp;
-
-		geometry_msgs::PointStamped _plane_normal; // In the base link frame.
-
-		try
-		{
-			tf_listener->waitForTransform("base_link", plane_normal.header.frame_id, plane_normal.header.stamp, ros::Duration(1));
-			tf_listener->transformPoint("base_link", plane_normal, _plane_normal);
-		}
-		catch(tf::TransformException& ex)
-		{
-		  	ROS_INFO("COCKED UP POINT INFO! Why: %s", ex.what());
-		}
-
-
+		tf::Vector3 plane_normal (coefficients->values[0], coefficients->values[1], coefficients->values[2]);
+		tf::Vector3 _plane_normal = base_link_to_openni*plane_normal;
+		
 		// What's the angle between this vector and the actual z axis? cos_inverse ( j component )...
-		tf::Vector3 normal (_plane_normal.point.x, _plane_normal.point.y, _plane_normal.point.z);
+		tf::Vector3 normal (_plane_normal.x(), _plane_normal.y(), _plane_normal.z());
 		normal = normal.normalized();
 
 		if(acos (normal.z()) < 0.1)
@@ -247,39 +241,24 @@ void ClusterExtraction::processCloud()
      * COMPUTE THE CENTROID OF THE PLANE AND PUBLISH IT.
      */
     //////////////////////////////////////////////////////////////////////
-    geometry_msgs::PointStamped plane_centroid;
-    plane_centroid.point.x = 0.0;
-    plane_centroid.point.y = 0.0;
-    plane_centroid.point.z = 0.0;
-    plane_centroid.header.frame_id = cloud->header.frame_id;
-    plane_centroid.header.stamp = stamp;
-
     Eigen::Vector4f plane_cen;
 
     // REMOVE COMMENTS WITH REAL ROBOT!!!
     pcl::compute3DCentroid(*cloud_plane, plane_cen);
-
-    plane_centroid.point.x = plane_cen[0];
-    plane_centroid.point.y = plane_cen[1];
-    plane_centroid.point.z = plane_cen[2];
-
     std::cout<< plane_cen;
 
-    geometry_msgs::PointStamped _plane_centroid, _plane_normal;
-
-    try
-    {
-    	tf_listener->waitForTransform("base_link", plane_centroid.header.frame_id, plane_centroid.header.stamp, ros::Duration(1));
-    	tf_listener->transformPoint("base_link", plane_centroid, _plane_centroid);
-    }
-
-    catch(tf::TransformException& ex)
-    {
-    	ROS_INFO("COCKED UP POINT INFO! Why: %s", ex.what());
-    }
+    tf::Vector3 plane_centroid (plane_cen[0], plane_cen[1], plane_cen[2]);
+    tf::Vector3 _plane_centroid = base_link_to_openni*plane_centroid;
+    
+    geometry_msgs::PointStamped _plane_centroid_ROSMsg;
+    _plane_centroid_ROSMsg.header.frame_id = "base_link";
+    _plane_centroid_ROSMsg.header.stamp = stamp;
+    _plane_centroid_ROSMsg.point.x = _plane_centroid.x();
+    _plane_centroid_ROSMsg.point.y = _plane_centroid.y();
+    _plane_centroid_ROSMsg.point.z = _plane_centroid.z();
 
     // Publish the centroid.
-    table_position_pub.publish(_plane_centroid);
+    table_position_pub.publish(_plane_centroid_ROSMsg);
 
    	pcl::search::KdTree<PoinT>::Ptr tree (new pcl::search::KdTree<PoinT>);
    	tree->setInputCloud (cloud);
@@ -328,39 +307,25 @@ void ClusterExtraction::processCloud()
    		cloud_cluster->is_dense = true;
    		cloud_cluster->header.frame_id = cloud->header.frame_id;
 
-   		geometry_msgs::PointStamped cluster_centroid;
-   		cluster_centroid.point.x = 0.0;
-   		cluster_centroid.point.y = 0.0;
-   		cluster_centroid.point.z = 0.0;
-   		cluster_centroid.header.frame_id = cloud_cluster->header.frame_id;
-   		cluster_centroid.header.stamp = stamp;
-
    		Eigen::Vector4f cluster_cen;
 
    		pcl::compute3DCentroid(*cloud_cluster, cluster_cen);
 
-   		cluster_centroid.point.x = cluster_cen[0];
-   		cluster_centroid.point.y = cluster_cen[1];
-   		cluster_centroid.point.z = cluster_cen[2];
+   		tf::Vector3 cluster_centroid (cluster_cen[0], cluster_cen[1], cluster_cen[2]);
+   		tf::Vector3 _cluster_centroid = base_link_to_openni*cluster_centroid;
 
-   		geometry_msgs::PointStamped _cluster_centroid;
+   		geometry_msgs::PointStamped _cluster_centroid_ROSMsg;
+   		_cluster_centroid_ROSMsg.header.frame_id = "base_link";
+   		_cluster_centroid_ROSMsg.header.stamp = stamp;
+   		_cluster_centroid_ROSMsg.point.x = _cluster_centroid.x();
+  		_cluster_centroid_ROSMsg.point.y = _cluster_centroid.y();
+   		_cluster_centroid_ROSMsg.point.z = _cluster_centroid.z();
 
-   		try
-   		{
-   			tf_listener->waitForTransform("base_link", cluster_centroid.header.frame_id, cluster_centroid.header.stamp, ros::Duration(1));
-   			tf_listener->transformPoint("base_link", cluster_centroid, _cluster_centroid);
-   		}
-   		catch(tf::TransformException& ex)
-   		{
-   			ROS_INFO("COCKED UP POINT INFO! Why: %s", ex.what());
-   		}
-
-
-   		if(DIST(cluster_centroid.point,plane_centroid.point) < 0.3)
+   		if(DIST(cluster_centroid,plane_centroid) < 0.3)
    		{
    			doro_msgs::Cluster __cluster;
-   			__cluster.centroid = _cluster_centroid;
-   			__cluster.cluster_size = cloud_cluster->width * cluster_centroid.point.z;
+   			__cluster.centroid = _cluster_centroid_ROSMsg;
+   			__cluster.cluster_size = cloud_cluster->width * cluster_cen[2];
    			__cluster.x = ourx;
    			__cluster.y = oury;
    			__clusters.clusters.push_back (__cluster);
