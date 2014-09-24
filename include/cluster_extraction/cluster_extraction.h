@@ -54,6 +54,11 @@ class ClusterExtraction: public nodelet::Nodelet
 protected:
 
 	/**
+	 * A variable to hold the subscription state.
+	 */
+	bool subscribed_;
+
+	/**
 	 * A Listener for transforms.
 	 */
 	tf::TransformListener *tf_listener;
@@ -111,6 +116,12 @@ public:
 	 * The overloaded onInit() method. This is called when the nodelet is loaded.
 	 */
 	void onInit();
+
+protected:
+	/**
+	 * Compute approximate dimentions of the objects seen.
+	 */
+	std::vector <double> getClusterDimensions(const pcl::PointCloud<PoinT>::ConstPtr& input_cluster, tf::StampedTransform& base_link_to_openni_transform);
 
 	/**
 	 * Callback for the point cloud data.

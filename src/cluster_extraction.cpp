@@ -28,7 +28,11 @@ ClusterExtraction::~ClusterExtraction()
 	table_cloud_pub.shutdown();
 	clusters_pub.shutdown();
 
-	cloud_sub.shutdown();
+	if(!cloud_sub.getTopic().empty())
+	{
+		ROS_INFO("Un-subscribing to \'/xtion_camera/depth/points\'...");
+		cloud_sub.shutdown();
+	}
 }
 
 void ClusterExtraction::onInit()
@@ -52,8 +56,7 @@ void ClusterExtraction::onInit()
 
 	clusters_pub = nh.advertise<doro_msgs::ClusterArray> ("/clusters", 1);
 
-	cloud_sub = nh.subscribe("/xtion_camera/depth/points", 10 , &ClusterExtraction::cloudCallback, this);
-
+	subscribed_ = false;
 	bool cluster_extraction_enable_param = false;
 
 	while(ros::ok())
@@ -61,12 +64,24 @@ void ClusterExtraction::onInit()
 		ros::param::get("/cluster_extraction_enable", cluster_extraction_enable_param);
 		if(cluster_extraction_enable_param)
 		{
+			if(!subscribed_)
+			{
+				ROS_INFO("Subscribing to \'/xtion_camera/depth/points\'...");
+				cloud_sub = nh.subscribe("/xtion_camera/depth/points", 10 , &ClusterExtraction::cloudCallback, this);
+				subscribed_ = true;
+			}
 			q.callOne(ros::WallDuration(1.0));
 			processCloud();
 		}
 		else
 		{
-			ROS_INFO("Parameter not set. No extraction will take place.");
+			if(subscribed_)
+			{
+				ROS_INFO("Un-subscribing to \'/xtion_camera/depth/points\'...");
+				cloud_sub.shutdown();
+				subscribed_ = false;
+			}
+			ROS_INFO(".");
 			sleep(1);
 		}
 	}
@@ -75,23 +90,9 @@ void ClusterExtraction::onInit()
 
 void ClusterExtraction::cloudCallback(const sensor_msgs::PointCloud2ConstPtr& _cloud)
 {
-	//bool cluster_extraction_enable = false, plane_extraction_enable = false;
-	//bool has_cluster_param = ros::param::get("/cluster_extraction_enable", cluster_extraction_enable);
-	//bool has_plane_param = ros::param::get("/plane_extraction_enable", plane_extraction_enable);
-
-	//if( (has_cluster_param && cluster_extraction_enable) || (has_plane_param && plane_extraction_enable) )
-	//{
-		// Convert the ROS message to a pcl point cloud (templated) type.
 	pcl_data = pcl::PointCloud<PoinT>::Ptr(new pcl::PointCloud<PoinT>);
 	stamp_ = _cloud->header.stamp;
 	pcl::fromROSMsg (*_cloud, *pcl_data);
-
-	ROS_INFO("CALLED BACK");
-	//}
-
-	//else
-		//if(pcl_data)
-			//pcl_data.reset();
 }
 
 void ClusterExtraction::processCloud()
@@ -100,7 +101,7 @@ void ClusterExtraction::processCloud()
 
 	if(!pcl_data)
 	{
-		ROS_INFO("No data. Either the parameters are not set. Or there is a problem.");
+		ROS_INFO("No xtion_camera data.");
 		sleep(1);
 		return;
 	}
@@ -115,8 +116,7 @@ void ClusterExtraction::processCloud()
 
 	//////////////////////////////////////////////////////////////////////
 	// Cluster Extraction
-	// Creating the KdTree object for the search method of the extraction
-
+	//////////////////////////////////////////////////////////////////////
 	// Findout the points that are more than 1.25 m away.
 	pcl::PointIndices::Ptr out_of_range_points (new pcl::PointIndices);
 	unsigned int i = 0;
@@ -233,7 +233,7 @@ void ClusterExtraction::processCloud()
 		return;
 	}
 
-	ROS_INFO("Table seen.");
+	//ROS_INFO("Table seen.");
 	table_cloud_pub.publish(cloud_plane);
 
     //////////////////////////////////////////////////////////////////////
@@ -245,7 +245,7 @@ void ClusterExtraction::processCloud()
 
     // REMOVE COMMENTS WITH REAL ROBOT!!!
     pcl::compute3DCentroid(*cloud_plane, plane_cen);
-    std::cout<< plane_cen;
+    //std::cout<< plane_cen;
 
     tf::Vector3 plane_centroid (plane_cen[0], plane_cen[1], plane_cen[2]);
     tf::Vector3 _plane_centroid = base_link_to_openni*plane_centroid;
@@ -299,6 +299,8 @@ void ClusterExtraction::processCloud()
    			oury += (indices[0] - oh_x) / 640;
    		}
 
+   		std::vector <double> cluster_dims = getClusterDimensions(cloud_cluster, base_link_to_openni);
+
    		ourx = ourx / (double) cloud_cluster->points.size ();
    		oury = oury / (double) cloud_cluster->points.size ();
 
@@ -325,7 +327,8 @@ void ClusterExtraction::processCloud()
    		{
    			doro_msgs::Cluster __cluster;
    			__cluster.centroid = _cluster_centroid_ROSMsg;
-   			__cluster.cluster_size = cloud_cluster->width * cluster_cen[2];
+   			//__cluster.cluster_size = cloud_cluster->width * cluster_cen[2];
+   			__cluster.cluster_size = cluster_dims;
    			__cluster.x = ourx;
    			__cluster.y = oury;
    			__clusters.clusters.push_back (__cluster);
@@ -340,6 +343,47 @@ void ClusterExtraction::processCloud()
 
     if(pcl_data)
     	pcl_data.reset();
+
+}
+
+std::vector <double> ClusterExtraction::getClusterDimensions(const pcl::PointCloud<PoinT>::ConstPtr& input_cluster, tf::StampedTransform& base_link_to_openni_transform)
+{
+	pcl::PointCloud <PoinT> transformed_cloud;
+
+	BOOST_FOREACH(const PoinT& pt, input_cluster->points)
+	{
+		tf::Vector3 _pt_(pt.x, pt.y, pt.z);
+		tf::Vector3 _pt_transformed_ = base_link_to_openni_transform*_pt_;
+		transformed_cloud.push_back(PoinT(_pt_transformed_.x(), _pt_transformed_.y(), _pt_transformed_.z()));
+	}
+
+	// Transformed cloud is now w.r.t. base_link frame.
+	transformed_cloud.header.frame_id = "base_link";
+
+	double min_X = 0.0, min_Y = 0.0, min_Z = 0.0, max_X = 0.0, max_Y = 0.0, max_Z = 0.0;
+
+	BOOST_FOREACH(const PoinT& pt, transformed_cloud.points)
+	{
+		if(pt.x > max_X)
+			max_X = pt.x;
+		if(pt.y > max_Y)
+			max_Y = pt.y;
+		if(pt.z > max_Z)
+			max_Z = pt.z;
+		if(pt.x > min_X)
+			min_X = pt.x;
+		if(pt.y > min_Y)
+			min_Y = pt.y;
+		if(pt.z > min_Z)
+			min_Z = pt.z;
+	}
+
+	std::vector <double> dims;
+	dims.push_back(max_X - min_X);
+	dims.push_back(max_Y - min_Y);
+	dims.push_back(max_Z - min_Z);
+
+	return dims;
 
 }
 
