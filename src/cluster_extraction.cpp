@@ -288,6 +288,11 @@ void ClusterExtraction::processCloud()
 
    		//printf("WORLDSUCKS");
    		pcl::PointCloud<PoinT>::Ptr cloud_cluster (new pcl::PointCloud<PoinT>);
+
+   		// Variables to find a bounding box.
+   		int min_index = 307200, max_index = 0;
+   		int start_index_x, start_index_y, end_index_x, end_index_y;
+
    		for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); pit++)
    		{
    			cloud_cluster->points.push_back (cloud->points[*pit]);
@@ -295,8 +300,24 @@ void ClusterExtraction::processCloud()
    			memcpy(indices, &cloud->points[*pit].data[3], 4);
 
    			int oh_x = indices[0] % 640;
+   			int oh_y = (indices[0] - oh_x) / 640;
    			ourx += oh_x;
-   			oury += (indices[0] - oh_x) / 640;
+   			oury += oh_y;
+
+   			if(indices[0] > max_index)
+   			{
+   				max_index = indices[0];
+   				end_index_x = oh_x;
+   				end_index_y = oh_y;
+   			}
+
+   			if(indices[0] < min_index)
+   			{
+   				min_index = indices[0];
+   				start_index_x = oh_x;
+   				start_index_y = oh_y;
+   			}
+
    		}
 
    		std::vector <double> cluster_dims = getClusterDimensions(cloud_cluster, base_link_to_openni);
@@ -329,6 +350,10 @@ void ClusterExtraction::processCloud()
    			__cluster.centroid = _cluster_centroid_ROSMsg;
    			//__cluster.cluster_size = cloud_cluster->width * cluster_cen[2];
    			__cluster.cluster_size = cluster_dims;
+   			__cluster.window.push_back(start_index_x);
+   			__cluster.window.push_back(start_index_y);
+   			__cluster.window.push_back(end_index_x);
+   			__cluster.window.push_back(end_index_y);
    			__cluster.x = ourx;
    			__cluster.y = oury;
    			__clusters.clusters.push_back (__cluster);
@@ -360,7 +385,8 @@ std::vector <double> ClusterExtraction::getClusterDimensions(const pcl::PointClo
 	// Transformed cloud is now w.r.t. base_link frame.
 	transformed_cloud.header.frame_id = "base_link";
 
-	double min_X = 0.0, min_Y = 0.0, min_Z = 0.0, max_X = 0.0, max_Y = 0.0, max_Z = 0.0;
+	double min_X = transformed_cloud.points[0].x, min_Y = transformed_cloud.points[0].y, min_Z = transformed_cloud.points[0].z,
+		   max_X = transformed_cloud.points[0].x, max_Y = transformed_cloud.points[0].y, max_Z = transformed_cloud.points[0].z;
 
 	BOOST_FOREACH(const PoinT& pt, transformed_cloud.points)
 	{
@@ -370,11 +396,11 @@ std::vector <double> ClusterExtraction::getClusterDimensions(const pcl::PointClo
 			max_Y = pt.y;
 		if(pt.z > max_Z)
 			max_Z = pt.z;
-		if(pt.x > min_X)
+		if(pt.x < min_X)
 			min_X = pt.x;
-		if(pt.y > min_Y)
+		if(pt.y < min_Y)
 			min_Y = pt.y;
-		if(pt.z > min_Z)
+		if(pt.z < min_Z)
 			min_Z = pt.z;
 	}
 
