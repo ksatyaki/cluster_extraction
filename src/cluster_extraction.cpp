@@ -290,8 +290,8 @@ void ClusterExtraction::processCloud()
    		pcl::PointCloud<PoinT>::Ptr cloud_cluster (new pcl::PointCloud<PoinT>);
 
    		// Variables to find a bounding box.
-   		int min_index = 307200, max_index = 0;
-   		int start_index_x, start_index_y, end_index_x, end_index_y;
+   		int min_x = 307200, max_x = 0;
+   		int min_y = 307200, max_y = 0;
 
    		for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); pit++)
    		{
@@ -304,20 +304,22 @@ void ClusterExtraction::processCloud()
    			ourx += oh_x;
    			oury += oh_y;
 
-   			if(indices[0] > max_index)
+   			if(oh_x > max_x)
    			{
-   				max_index = indices[0];
-   				end_index_x = oh_x;
-   				end_index_y = oh_y;
+   				max_x = oh_x;
    			}
-
-   			if(indices[0] < min_index)
+   			if(oh_y > max_y)
    			{
-   				min_index = indices[0];
-   				start_index_x = oh_x;
-   				start_index_y = oh_y;
+   				max_y = oh_y;
    			}
-
+   			if(oh_x < min_x)
+   			{
+   				min_x = oh_x;
+   			}
+   			if(oh_y < min_y)
+   			{
+   				min_y = oh_y;
+   			}
    		}
 
    		std::vector <double> cluster_dims = getClusterDimensions(cloud_cluster, base_link_to_openni);
@@ -350,10 +352,10 @@ void ClusterExtraction::processCloud()
    			__cluster.centroid = _cluster_centroid_ROSMsg;
    			//__cluster.cluster_size = cloud_cluster->width * cluster_cen[2];
    			__cluster.cluster_size = cluster_dims;
-   			__cluster.window.push_back(start_index_x);
-   			__cluster.window.push_back(start_index_y);
-   			__cluster.window.push_back(end_index_x);
-   			__cluster.window.push_back(end_index_y);
+   			__cluster.window.push_back(min_x);
+   			__cluster.window.push_back(min_y);
+   			__cluster.window.push_back(max_x);
+   			__cluster.window.push_back(max_y);
    			__cluster.x = ourx;
    			__cluster.y = oury;
    			__clusters.clusters.push_back (__cluster);
