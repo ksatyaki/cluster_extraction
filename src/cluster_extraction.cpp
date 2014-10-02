@@ -222,6 +222,7 @@ void ClusterExtraction::processCloud()
 			*cloud_plane = *cloud_f;
 		}
 
+
 		extract.setNegative (true);
 		extract.filter (*cloud_f);
 		*cloud = *cloud_f;
