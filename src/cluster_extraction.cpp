@@ -214,7 +214,9 @@ void ClusterExtraction::processCloud()
 		tf::Vector3 normal (_plane_normal.x(), _plane_normal.y(), _plane_normal.z());
 		normal = normal.normalized();
 
-		std::cout<<normal;
+		std::cout<<"x: "<<normal.x()<<"\t";
+		std::cout<<"y: "<<normal.y()<<"\t";
+		std::cout<<"z: "<<normal.z()<<"\t";
 
 		if(acos (normal.z()) < 0.1)
 		{
