@@ -214,9 +214,9 @@ void ClusterExtraction::processCloud()
 		tf::Vector3 normal (_plane_normal.x(), _plane_normal.y(), _plane_normal.z());
 		normal = normal.normalized();
 
-		std::cout<<"x: "<<normal.x()<<"\t";
-		std::cout<<"y: "<<normal.y()<<"\t";
-		std::cout<<"z: "<<normal.z()<<"\t";
+		//std::cout<<"x: "<<normal.x()<<"\t";
+		//std::cout<<"y: "<<normal.y()<<"\t";
+		//std::cout<<"z: "<<normal.z()<<"\t";
 
 		if(acos (normal.z()) < 0.4)
 		{
@@ -265,7 +265,16 @@ void ClusterExtraction::processCloud()
     // Publish the centroid.
     table_position_pub.publish(_plane_centroid_ROSMsg);
 
+    doro_msgs::ClusterArray __clusters;
+
    	pcl::search::KdTree<PoinT>::Ptr tree (new pcl::search::KdTree<PoinT>);
+
+   	if(cloud->points.size() == 0)
+   	{
+   		clusters_pub.publish(__clusters);
+   		return;
+   	}
+
    	tree->setInputCloud (cloud);
 
    	std::vector<pcl::PointIndices> cluster_indices;
@@ -285,7 +294,7 @@ void ClusterExtraction::processCloud()
    	double ourx = 0.0, oury = 0.0;
 
    	int j = 0;
-   	doro_msgs::ClusterArray __clusters;
+
 
    	for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
    	{
