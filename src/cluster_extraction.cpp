@@ -218,7 +218,7 @@ void ClusterExtraction::processCloud()
 		std::cout<<"y: "<<normal.y()<<"\t";
 		std::cout<<"z: "<<normal.z()<<"\t";
 
-		if(acos (normal.z()) < 0.1)
+		if(acos (normal.z()) < 0.4)
 		{
 			cloud_plane = pcl::PointCloud<PoinT>::Ptr(new pcl::PointCloud<PoinT>);
 			*cloud_plane = *cloud_f;
