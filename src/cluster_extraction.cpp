@@ -214,12 +214,13 @@ void ClusterExtraction::processCloud()
 		tf::Vector3 normal (_plane_normal.x(), _plane_normal.y(), _plane_normal.z());
 		normal = normal.normalized();
 
+		std::cout<<normal;
+
 		if(acos (normal.z()) < 0.1)
 		{
 			cloud_plane = pcl::PointCloud<PoinT>::Ptr(new pcl::PointCloud<PoinT>);
 			*cloud_plane = *cloud_f;
 		}
-
 
 		extract.setNegative (true);
 		extract.filter (*cloud_f);
@@ -229,6 +230,7 @@ void ClusterExtraction::processCloud()
 	if(!cloud_plane)
 	{
 		ROS_INFO("No table or table-like object could be seen. Can't extract...");
+
 		sleep(1);
 		return;
 	}
