@@ -265,7 +265,7 @@ void ClusterExtraction::processCloud()
 
    	std::vector<pcl::PointIndices> cluster_indices;
    	pcl::EuclideanClusterExtraction<PoinT> ec;
-   	ec.setClusterTolerance (0.05); // 2cm
+   	ec.setClusterTolerance (0.02); // 2cm
    	ec.setMinClusterSize (1500);
    	ec.setMaxClusterSize (25000);
    	ec.setSearchMethod (tree);
