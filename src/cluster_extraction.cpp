@@ -30,7 +30,7 @@ ClusterExtraction::~ClusterExtraction()
 
 	if(!cloud_sub.getTopic().empty())
 	{
-		ROS_INFO("Un-subscribing to \'/xtion_camera/depth/points\'...");
+		ROS_INFO("Un-subscribing to \'/xtion_camera/depth_registered/points\'...");
 		cloud_sub.shutdown();
 	}
 }
@@ -58,26 +58,32 @@ void ClusterExtraction::onInit()
 
 	subscribed_ = false;
 	bool cluster_extraction_enable_param = false;
+	float tolerance_param = 0.1;
+
+	ros::param::set("/plane_extraction_tolerance", tolerance_param);
+
+
 
 	while(ros::ok())
 	{
+		ros::param::get("/plane_extraction_tolerance", tolerance_param);
 		ros::param::get("/cluster_extraction_enable", cluster_extraction_enable_param);
 		if(cluster_extraction_enable_param)
 		{
 			if(!subscribed_)
 			{
-				ROS_INFO("Subscribing to \'/xtion_camera/depth/points\'...");
-				cloud_sub = nh.subscribe("/xtion_camera/depth/points", 10 , &ClusterExtraction::cloudCallback, this);
+				ROS_INFO("Subscribing to \'/xtion_camera/depth_registered/points\'...");
+				cloud_sub = nh.subscribe("/xtion_camera/depth_registered/points", 10 , &ClusterExtraction::cloudCallback, this);
 				subscribed_ = true;
 			}
 			q.callOne(ros::WallDuration(1.0));
-			processCloud();
+			processCloud(tolerance_param);
 		}
 		else
 		{
 			if(subscribed_)
 			{
-				ROS_INFO("Un-subscribing to \'/xtion_camera/depth/points\'...");
+				ROS_INFO("Un-subscribing to \'/xtion_camera/depth_registered/points\'...");
 				cloud_sub.shutdown();
 				subscribed_ = false;
 			}
@@ -95,7 +101,7 @@ void ClusterExtraction::cloudCallback(const sensor_msgs::PointCloud2ConstPtr& _c
 	pcl::fromROSMsg (*_cloud, *pcl_data);
 }
 
-void ClusterExtraction::processCloud()
+void ClusterExtraction::processCloud(float plane_tolerance)
 {
 	ros::Time stamp = ros::Time::now();
 
@@ -218,7 +224,7 @@ void ClusterExtraction::processCloud()
 		//std::cout<<"y: "<<normal.y()<<"\t";
 		//std::cout<<"z: "<<normal.z()<<"\t";
 
-		if(acos (normal.z()) < 0.4)
+		if(acos (normal.z()) < plane_tolerance)
 		{
 			cloud_plane = pcl::PointCloud<PoinT>::Ptr(new pcl::PointCloud<PoinT>);
 			*cloud_plane = *cloud_f;
@@ -307,6 +313,9 @@ void ClusterExtraction::processCloud()
    		int min_x = 307200, max_x = 0;
    		int min_y = 307200, max_y = 0;
 
+   		long int color_r, color_g, color_b;
+   		uint8_t mean_r, mean_g, mean_b;
+
    		for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); pit++)
    		{
    			cloud_cluster->points.push_back (cloud->points[*pit]);
@@ -334,12 +343,25 @@ void ClusterExtraction::processCloud()
    			{
    				min_y = oh_y;
    			}
+
+   			/* ***************** */
+   			/* COLOR COMPUTATION */
+   			/* ***************** */
+
+   			color_r += cloud->points[*pit].r;
+   			color_g += cloud->points[*pit].g;
+   			color_b += cloud->points[*pit].b;
+
    		}
 
    		std::vector <double> cluster_dims = getClusterDimensions(cloud_cluster, base_link_to_openni);
 
    		ourx = ourx / (double) cloud_cluster->points.size ();
    		oury = oury / (double) cloud_cluster->points.size ();
+
+   		mean_r = (uint8_t) (color_r / cloud_cluster->points.size ());
+   		mean_g = (uint8_t) (color_g / cloud_cluster->points.size ());
+   		mean_b = (uint8_t) (color_b / cloud_cluster->points.size ());
 
    		cloud_cluster->width = cloud_cluster->points.size ();
    		cloud_cluster->height = 1;
@@ -364,8 +386,16 @@ void ClusterExtraction::processCloud()
    		{
    			doro_msgs::Cluster __cluster;
    			__cluster.centroid = _cluster_centroid_ROSMsg;
-   			//__cluster.cluster_size = cloud_cluster->width * cluster_cen[2];
+
+   			// Push cluster dimentions. Viewed width, breadth and height
    			__cluster.cluster_size = cluster_dims;
+
+   			// Push colors
+   			__cluster.color.push_back(mean_r);
+   			__cluster.color.push_back(mean_g);
+   			__cluster.color.push_back(mean_b);
+
+   			// Push window
    			__cluster.window.push_back(min_x);
    			__cluster.window.push_back(min_y);
    			__cluster.window.push_back(max_x);
@@ -421,8 +451,11 @@ std::vector <double> ClusterExtraction::getClusterDimensions(const pcl::PointClo
 	}
 
 	std::vector <double> dims;
-	dims.push_back(max_X - min_X);
+	// Width first.
 	dims.push_back(max_Y - min_Y);
+	// Breadth next.
+	dims.push_back(max_X - min_X);
+	// Height last.
 	dims.push_back(max_Z - min_Z);
 
 	return dims;

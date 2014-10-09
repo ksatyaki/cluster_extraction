@@ -33,7 +33,7 @@
 
 #define DIST(A, B) sqrt ( ((A.x()-B.x())*(A.x()-B.x())) + ((A.y()-B.y())*(A.y()-B.y())) + ((A.z()-B.z())*(A.z()-B.z())) )
 
-typedef pcl::PointXYZ PoinT;
+typedef pcl::PointXYZRGB PoinT;
 
 namespace cluster_extraction
 {
@@ -131,7 +131,7 @@ protected:
 	/**
 	 * The function where the point cloud is processed.
 	 */
-	void processCloud();
+	void processCloud(float plane_tolerance);
 
 	/**
 	 * Return the number of planes detected.
