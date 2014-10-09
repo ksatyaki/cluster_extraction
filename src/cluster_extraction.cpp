@@ -425,7 +425,11 @@ std::vector <double> ClusterExtraction::getClusterDimensions(const pcl::PointClo
 	{
 		tf::Vector3 _pt_(pt.x, pt.y, pt.z);
 		tf::Vector3 _pt_transformed_ = base_link_to_openni_transform*_pt_;
-		transformed_cloud.push_back(PoinT(_pt_transformed_.x(), _pt_transformed_.y(), _pt_transformed_.z()));
+		PoinT thisPoint;
+		thisPoint.x = _pt_transformed_.x();
+		thisPoint.y = _pt_transformed_.y();
+		thisPoint.z = _pt_transformed_.z();
+		transformed_cloud.push_back(thisPoint);
 	}
 
 	// Transformed cloud is now w.r.t. base_link frame.
