@@ -59,6 +59,11 @@ protected:
 	bool subscribed_;
 
 	/**
+	 * Associate this to the private node handle;
+	 */
+	ros::CallbackQueue q;
+
+	/**
 	 * A Listener for transforms.
 	 */
 	tf::TransformListener *tf_listener;
@@ -107,6 +112,16 @@ protected:
 	  * A templated point cloud type to hold the data.
 	  */
 	 pcl::PointCloud<PoinT>::Ptr pcl_data;
+
+	 /**
+	  * A thread id for the cluster_extraction thread.
+	  */
+	 pthread_t c_e_thread_id_;
+
+	 /**
+	  * The thread where we do the polling.
+	  */
+	 static void *clusterExtractionThread(void *_this_);
 
 public:
 	ClusterExtraction();

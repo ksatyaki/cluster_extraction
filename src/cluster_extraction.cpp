@@ -37,12 +37,9 @@ ClusterExtraction::~ClusterExtraction()
 
 void ClusterExtraction::onInit()
 {
-	ros::NodeHandle nh;
-	ros::CallbackQueue q;
+	ros::NodeHandle nh = getPrivateNodeHandle();
 
 	nh.setCallbackQueue(&q);
-
-	NODELET_INFO("Cluster Extraction has started!");
 
 	tf_listener = new tf::TransformListener(nh, ros::Duration(10));
 	
@@ -56,13 +53,22 @@ void ClusterExtraction::onInit()
 
 	clusters_pub = nh.advertise<doro_msgs::ClusterArray> ("/clusters", 1);
 
-	subscribed_ = false;
+	pthread_create(&c_e_thread_id_, NULL, &ClusterExtraction::clusterExtractionThread, (void *) this);
+
+	NODELET_INFO("Cluster Extraction has started!");
+
+}
+
+void* ClusterExtraction::clusterExtractionThread(void* _this_)
+{
+	ClusterExtraction* ptr = (ClusterExtraction *) _this_;
+	ros::NodeHandle nh = ptr->getPrivateNodeHandle();
+
+	ptr->subscribed_ = false;
 	bool cluster_extraction_enable_param = false;
 	float tolerance_param = 0.1;
 
 	ros::param::set("/plane_extraction_tolerance", tolerance_param);
-
-
 
 	while(ros::ok())
 	{
@@ -70,27 +76,30 @@ void ClusterExtraction::onInit()
 		ros::param::get("/cluster_extraction_enable", cluster_extraction_enable_param);
 		if(cluster_extraction_enable_param)
 		{
-			if(!subscribed_)
+			if(!ptr->subscribed_)
 			{
 				ROS_INFO("Subscribing to \'/xtion_camera/depth_registered/points\'...");
-				cloud_sub = nh.subscribe("/xtion_camera/depth_registered/points", 10 , &ClusterExtraction::cloudCallback, this);
-				subscribed_ = true;
+				ptr->cloud_sub = nh.subscribe("/xtion_camera/depth_registered/points", 2 , &ClusterExtraction::cloudCallback, ptr);
+				ptr->subscribed_ = true;
 			}
-			q.callOne(ros::WallDuration(1.0));
-			processCloud(tolerance_param);
+			ptr->q.callOne(ros::WallDuration(1.0));
+			ptr->processCloud(tolerance_param);
 		}
 		else
 		{
-			if(subscribed_)
+			if(ptr->subscribed_)
 			{
 				ROS_INFO("Un-subscribing to \'/xtion_camera/depth_registered/points\'...");
-				cloud_sub.shutdown();
-				subscribed_ = false;
+				ptr->cloud_sub.shutdown();
+				ptr->subscribed_ = false;
 			}
-			ROS_INFO(".");
+			//ROS_INFO(".");
 			sleep(1);
 		}
+		printf("\rWait for parameter.");
 	}
+
+	return NULL;
 
 }
 
@@ -245,7 +254,7 @@ void ClusterExtraction::processCloud(float plane_tolerance)
 	}
 
 	//ROS_INFO("Table seen.");
-	table_cloud_pub.publish(cloud_plane);
+	//table_cloud_pub.publish(cloud_plane);
 
     //////////////////////////////////////////////////////////////////////
     /**
