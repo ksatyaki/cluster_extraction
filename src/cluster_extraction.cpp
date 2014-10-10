@@ -37,21 +37,19 @@ ClusterExtraction::~ClusterExtraction()
 
 void ClusterExtraction::onInit()
 {
-	ros::NodeHandle nh = getPrivateNodeHandle();
+	 nh_.setCallbackQueue(&q_);
 
-	nh.setCallbackQueue(&q);
-
-	tf_listener = new tf::TransformListener(nh, ros::Duration(10));
+	tf_listener = new tf::TransformListener(nh_, ros::Duration(10));
 	
-	filtered_cloud_pub = nh.advertise<sensor_msgs::PointCloud2> ("/manipulation_scene", 1);
+	filtered_cloud_pub = nh_.advertise<sensor_msgs::PointCloud2> ("/manipulation_scene", 1);
 
-	table_position_pub = nh.advertise<geometry_msgs::PointStamped> ("/table_position", 1);
+	table_position_pub = nh_.advertise<geometry_msgs::PointStamped> ("/table_position", 1);
 
-	table_cloud_pub = nh.advertise<sensor_msgs::PointCloud2> ("/plane_cloud", 1);
+	table_cloud_pub = nh_.advertise<sensor_msgs::PointCloud2> ("/plane_cloud", 1);
 
 	//table_coeffs_pub = nh.advertise<pcl_msgs::ModelCoefficients> ("/table_coeffs", 1);
 
-	clusters_pub = nh.advertise<doro_msgs::ClusterArray> ("/clusters", 1);
+	clusters_pub = nh_.advertise<doro_msgs::ClusterArray> ("/clusters", 1);
 
 	pthread_create(&c_e_thread_id_, NULL, &ClusterExtraction::clusterExtractionThread, (void *) this);
 
@@ -62,7 +60,6 @@ void ClusterExtraction::onInit()
 void* ClusterExtraction::clusterExtractionThread(void* _this_)
 {
 	ClusterExtraction* ptr = (ClusterExtraction *) _this_;
-	ros::NodeHandle nh = ptr->getPrivateNodeHandle();
 
 	ptr->subscribed_ = false;
 	bool cluster_extraction_enable_param = false;
@@ -79,10 +76,10 @@ void* ClusterExtraction::clusterExtractionThread(void* _this_)
 			if(!ptr->subscribed_)
 			{
 				ROS_INFO("Subscribing to \'/xtion_camera/depth_registered/points\'...");
-				ptr->cloud_sub = nh.subscribe("/xtion_camera/depth_registered/points", 2 , &ClusterExtraction::cloudCallback, ptr);
+				ptr->cloud_sub = nh_.subscribe("/xtion_camera/depth_registered/points", 2 , &ClusterExtraction::cloudCallback, ptr);
 				ptr->subscribed_ = true;
 			}
-			ptr->q.callOne(ros::WallDuration(1.0));
+			ptr->q_.callOne(ros::WallDuration(1.0));
 			ptr->processCloud(tolerance_param);
 		}
 		else
@@ -93,10 +90,9 @@ void* ClusterExtraction::clusterExtractionThread(void* _this_)
 				ptr->cloud_sub.shutdown();
 				ptr->subscribed_ = false;
 			}
-			//ROS_INFO(".");
+			ROS_INFO(".");
 			sleep(1);
 		}
-		printf("\rWait for parameter.");
 	}
 
 	return NULL;

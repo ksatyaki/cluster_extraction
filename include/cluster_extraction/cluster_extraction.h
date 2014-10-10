@@ -59,9 +59,14 @@ protected:
 	bool subscribed_;
 
 	/**
+	 * A nodehandle for this class.
+	 */
+	ros::NodeHandle nh_;
+
+	/**
 	 * Associate this to the private node handle;
 	 */
-	ros::CallbackQueue q;
+	ros::CallbackQueue q_;
 
 	/**
 	 * A Listener for transforms.
