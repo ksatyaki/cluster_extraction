@@ -76,7 +76,7 @@ void* ClusterExtraction::clusterExtractionThread(void* _this_)
 			if(!ptr->subscribed_)
 			{
 				ROS_INFO("Subscribing to \'/xtion_camera/depth_registered/points\'...");
-				ptr->cloud_sub = nh_.subscribe("/xtion_camera/depth_registered/points", 2 , &ClusterExtraction::cloudCallback, ptr);
+				ptr->cloud_sub = ptr->nh_.subscribe("/xtion_camera/depth_registered/points", 2 , &ClusterExtraction::cloudCallback, ptr);
 				ptr->subscribed_ = true;
 			}
 			ptr->q_.callOne(ros::WallDuration(1.0));
