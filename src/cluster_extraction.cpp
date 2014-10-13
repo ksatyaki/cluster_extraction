@@ -199,6 +199,9 @@ void ClusterExtraction::processCloud(float plane_tolerance)
 	}
 
 
+	// We do this here so that we can put in an empty cluster, if we see no table in the first place.
+	doro_msgs::ClusterArray __clusters;
+
 	while (cloud->points.size () > 0.5 * nr_points)
 	{
 		seg.setInputCloud (cloud);
@@ -244,7 +247,7 @@ void ClusterExtraction::processCloud(float plane_tolerance)
 	if(!cloud_plane)
 	{
 		ROS_INFO("No table or table-like object could be seen. Can't extract...");
-
+		clusters_pub.publish(__clusters);
 		sleep(1);
 		return;
 	}
@@ -276,9 +279,7 @@ void ClusterExtraction::processCloud(float plane_tolerance)
     // Publish the centroid.
     table_position_pub.publish(_plane_centroid_ROSMsg);
 
-    doro_msgs::ClusterArray __clusters;
-
-   	pcl::search::KdTree<PoinT>::Ptr tree (new pcl::search::KdTree<PoinT>);
+    pcl::search::KdTree<PoinT>::Ptr tree (new pcl::search::KdTree<PoinT>);
 
    	if(cloud->points.size() == 0)
    	{
