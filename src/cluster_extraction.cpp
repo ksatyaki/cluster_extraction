@@ -388,7 +388,7 @@ void ClusterExtraction::processCloud(float plane_tolerance)
   		_cluster_centroid_ROSMsg.point.y = _cluster_centroid.y();
    		_cluster_centroid_ROSMsg.point.z = _cluster_centroid.z();
 
-   		if(DIST(cluster_centroid,plane_centroid) < 0.3 && cluster_centroid.z() > plane_centroid.z())
+   		if(DIST(cluster_centroid,plane_centroid) < 0.3 && _cluster_centroid.z() > _plane_centroid.z())
    		{
    			doro_msgs::Cluster __cluster;
    			__cluster.centroid = _cluster_centroid_ROSMsg;
