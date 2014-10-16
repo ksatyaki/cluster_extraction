@@ -178,7 +178,7 @@ void ClusterExtraction::processCloud(float plane_tolerance)
 	seg.setOptimizeCoefficients (true);
 	seg.setModelType (pcl::SACMODEL_PLANE);
 	seg.setMethodType (pcl::SAC_RANSAC);
-	seg.setMaxIterations (100);
+	seg.setMaxIterations (1000);
 	seg.setDistanceThreshold (0.02);
 
 	// Remove the planes.
