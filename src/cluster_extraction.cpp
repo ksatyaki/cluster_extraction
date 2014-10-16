@@ -148,7 +148,7 @@ void ClusterExtraction::processCloud(float plane_tolerance)
 
 	BOOST_FOREACH(const PoinT& pt, _cloud->points)
 	{
-		if(sqrt( (pt.x*pt.x) + (pt.y*pt.y) + (pt.z*pt.z) ) > 1.35 || isnan (pt.x) || isnan (pt.y) || isnan (pt.z) ||
+		if(sqrt( (pt.x*pt.x) + (pt.y*pt.y) + (pt.z*pt.z) ) > 1.5 || isnan (pt.x) || isnan (pt.y) || isnan (pt.z) ||
 				  isinf (pt.x) || isinf (pt.y) || isinf (pt.z) )
 			out_of_range_points->indices.push_back(i);
 
