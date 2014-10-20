@@ -47,6 +47,8 @@ void ClusterExtraction::onInit()
 
 	table_cloud_pub = nh_.advertise<sensor_msgs::PointCloud2> ("/plane_cloud", 1);
 
+	cloud_sub = nh_.subscribe("/xtion_camera/depth_registered/points", 2 , &ClusterExtraction::cloudCallback, this);
+
 	//table_coeffs_pub = nh.advertise<pcl_msgs::ModelCoefficients> ("/table_coeffs", 1);
 
 	clusters_pub = nh_.advertise<doro_msgs::ClusterArray> ("/clusters", 1);
@@ -73,30 +75,16 @@ void* ClusterExtraction::clusterExtractionThread(void* _this_)
 		ros::param::get("/cluster_extraction_enable", cluster_extraction_enable_param);
 		if(cluster_extraction_enable_param)
 		{
-			if(!ptr->subscribed_)
-			{
-				ROS_INFO("Subscribing to \'/xtion_camera/depth_registered/points\'...");
-				ptr->cloud_sub = ptr->nh_.subscribe("/xtion_camera/depth_registered/points", 2 , &ClusterExtraction::cloudCallback, ptr);
-				ptr->subscribed_ = true;
-			}
 			ptr->q_.callOne(ros::WallDuration(1.0));
 			ptr->processCloud(tolerance_param);
 		}
 		else
 		{
-			if(ptr->subscribed_)
-			{
-				ROS_INFO("Un-subscribing to \'/xtion_camera/depth_registered/points\'...");
-				ptr->cloud_sub.shutdown();
-				ptr->subscribed_ = false;
-			}
-			ROS_INFO(".");
+			//ROS_INFO(".");
 			sleep(1);
 		}
 	}
-
 	return NULL;
-
 }
 
 void ClusterExtraction::cloudCallback(const sensor_msgs::PointCloud2ConstPtr& _cloud)
@@ -247,8 +235,8 @@ void ClusterExtraction::processCloud(float plane_tolerance)
 	if(!cloud_plane)
 	{
 		ROS_INFO("No table or table-like object could be seen. Can't extract...");
-		clusters_pub.publish(__clusters);
-		sleep(1);
+		//clusters_pub.publish(__clusters);
+		//sleep(1);
 		return;
 	}
 
