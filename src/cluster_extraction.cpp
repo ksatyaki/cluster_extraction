@@ -47,7 +47,7 @@ void ClusterExtraction::onInit()
 
 	table_cloud_pub = nh_.advertise<sensor_msgs::PointCloud2> ("/plane_cloud", 1);
 
-	cloud_sub = nh_.subscribe("/xtion_camera/depth_registered/points", 2 , &ClusterExtraction::cloudCallback, this);
+	cloud_sub = nh_.subscribe("/xtion_camera/depth_registered/points", 3, &ClusterExtraction::cloudCallback, this);
 
 	//table_coeffs_pub = nh.advertise<pcl_msgs::ModelCoefficients> ("/table_coeffs", 1);
 
@@ -89,9 +89,10 @@ void* ClusterExtraction::clusterExtractionThread(void* _this_)
 
 void ClusterExtraction::cloudCallback(const sensor_msgs::PointCloud2ConstPtr& _cloud)
 {
-	pcl_data = pcl::PointCloud<PoinT>::Ptr(new pcl::PointCloud<PoinT>);
-	stamp_ = _cloud->header.stamp;
-	pcl::fromROSMsg (*_cloud, *pcl_data);
+	pcl_data = _cloud;
+	//pcl::PointCloud<PoinT>::Ptr(new pcl::PointCloud<PoinT>);
+	//stamp_ = _cloud->header.stamp;
+	//pcl::fromROSMsg (*_cloud, *pcl_data);
 }
 
 void ClusterExtraction::processCloud(float plane_tolerance)
@@ -105,8 +106,10 @@ void ClusterExtraction::processCloud(float plane_tolerance)
 		return;
 	}
 
-	pcl::PointCloud<PoinT>::Ptr _cloud;// (new pcl::PointCloud<PoinT>);
-	_cloud = pcl_data;
+	//pcl::PointCloud<PoinT>::Ptr _cloud;// (new pcl::PointCloud<PoinT>);
+	sensor_msgs::PointCloud2ConstPtr _temp_cloud_ = pcl_data;
+	pcl::PointCloud<PoinT>::Ptr _cloud (new pcl::PointCloud<PoinT>);
+	pcl::fromROSMsg(*_temp_cloud_, *_cloud);
 
 
 	/**********************************************

@@ -116,7 +116,8 @@ protected:
 	 /**
 	  * A templated point cloud type to hold the data.
 	  */
-	 pcl::PointCloud<PoinT>::Ptr pcl_data;
+	 //pcl::PointCloud<PoinT>::Ptr
+	 sensor_msgs::PointCloud2ConstPtr pcl_data;
 
 	 /**
 	  * A thread id for the cluster_extraction thread.
