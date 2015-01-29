@@ -22,6 +22,7 @@ ClusterExtraction::ClusterExtraction()
 
 ClusterExtraction::~ClusterExtraction()
 {
+	ROS_INFO("In destructor...");
 
 	filtered_cloud_pub.shutdown();
 	table_position_pub.shutdown();
@@ -37,7 +38,7 @@ ClusterExtraction::~ClusterExtraction()
 
 void ClusterExtraction::onInit()
 {
-	 nh_.setCallbackQueue(&q_);
+	// nh_.setCallbackQueue(&q_);
 
 	tf_listener = new tf::TransformListener(nh_, ros::Duration(10));
 	
@@ -75,7 +76,7 @@ void* ClusterExtraction::clusterExtractionThread(void* _this_)
 		ros::param::get("/cluster_extraction_enable", cluster_extraction_enable_param);
 		if(cluster_extraction_enable_param)
 		{
-			ptr->q_.callOne(ros::WallDuration(1.0));
+			//ptr->q_.callOne(ros::WallDuration(1.0));
 			ptr->processCloud(tolerance_param);
 		}
 		else
@@ -409,8 +410,8 @@ void ClusterExtraction::processCloud(float plane_tolerance)
 
    	/////////////// RUBBISH ENDS ////////////////
 
-    if(pcl_data)
-    	pcl_data.reset();
+    //if(pcl_data)
+    //	pcl_data.reset();
 
 }
 
