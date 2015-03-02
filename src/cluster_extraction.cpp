@@ -112,6 +112,15 @@ void ClusterExtraction::processCloud(float plane_tolerance)
 	pcl::PointCloud<PoinT>::Ptr _cloud (new pcl::PointCloud<PoinT>);
 	pcl::fromROSMsg(*_temp_cloud_, *_cloud);
 
+	pcl::VoxelGrid<PoinT> vg_filter;
+	pcl::PointCloud<PoinT>::Ptr cloud_filtered (new pcl::PointCloud<PoinT>);
+
+	vg_filter.setInputCloud (_cloud);
+	vg_filter.setLeafSize (0.01f, 0.01f, 0.01f);
+	vg_filter.filter (*cloud_filtered);
+
+	_cloud = cloud_filtered;
+
 
 	/**********************************************
 	 * NEW BULL
@@ -123,20 +132,6 @@ void ClusterExtraction::processCloud(float plane_tolerance)
 	// Findout the points that are more than 1.25 m away.
 	pcl::PointIndices::Ptr out_of_range_points (new pcl::PointIndices);
 	unsigned int i = 0;
-	BOOST_FOREACH(PoinT& pt, _cloud->points)
-	{
-		int ind[2];
-		ind[0] = i;
-		//% _cloud->width;
-		ind[1] = (i - ind[0])/ _cloud->width;
-
-		memcpy(&pt.data[3], ind, 4);
-
-		//pt.data_c[0] = _index.value;
-		i++;
-	}
-
-	i = 0;
 
 	BOOST_FOREACH(const PoinT& pt, _cloud->points)
 	{
@@ -284,7 +279,7 @@ void ClusterExtraction::processCloud(float plane_tolerance)
    	std::vector<pcl::PointIndices> cluster_indices;
    	pcl::EuclideanClusterExtraction<PoinT> ec;
    	ec.setClusterTolerance (0.02); // 2cm
-   	ec.setMinClusterSize (1500);
+   	ec.setMinClusterSize (200);
    	ec.setMaxClusterSize (25000);
    	ec.setSearchMethod (tree);
    	ec.setInputCloud (cloud);
@@ -295,21 +290,12 @@ void ClusterExtraction::processCloud(float plane_tolerance)
 
    	//ROS_INFO("GOOD TILL HERE!");
 
-   	double ourx = 0.0, oury = 0.0;
-
    	int j = 0;
 
 
    	for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
    	{
-   		ourx = 0.0, oury = 0.0;
-
-   		//printf("WORLDSUCKS");
    		pcl::PointCloud<PoinT>::Ptr cloud_cluster (new pcl::PointCloud<PoinT>);
-
-   		// Variables to find a bounding box.
-   		int min_x = 307200, max_x = 0;
-   		int min_y = 307200, max_y = 0;
 
    		long int color_r, color_g, color_b;
    		uint8_t mean_r, mean_g, mean_b;
@@ -317,31 +303,6 @@ void ClusterExtraction::processCloud(float plane_tolerance)
    		for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); pit++)
    		{
    			cloud_cluster->points.push_back (cloud->points[*pit]);
-   			int indices[2];
-   			memcpy(indices, &cloud->points[*pit].data[3], 4);
-
-   			int oh_x = indices[0] % 640;
-   			int oh_y = (indices[0] - oh_x) / 640;
-   			ourx += oh_x;
-   			oury += oh_y;
-
-   			if(oh_x > max_x)
-   			{
-   				max_x = oh_x;
-   			}
-   			if(oh_y > max_y)
-   			{
-   				max_y = oh_y;
-   			}
-   			if(oh_x < min_x)
-   			{
-   				min_x = oh_x;
-   			}
-   			if(oh_y < min_y)
-   			{
-   				min_y = oh_y;
-   			}
-
    			/* ***************** */
    			/* COLOR COMPUTATION */
    			/* ***************** */
@@ -353,9 +314,6 @@ void ClusterExtraction::processCloud(float plane_tolerance)
    		}
 
    		std::vector <double> cluster_dims = getClusterDimensions(cloud_cluster, base_link_to_openni);
-
-   		ourx = ourx / (double) cloud_cluster->points.size ();
-   		oury = oury / (double) cloud_cluster->points.size ();
 
    		mean_r = (uint8_t) (color_r / cloud_cluster->points.size ());
    		mean_g = (uint8_t) (color_g / cloud_cluster->points.size ());
@@ -380,26 +338,16 @@ void ClusterExtraction::processCloud(float plane_tolerance)
   		_cluster_centroid_ROSMsg.point.y = _cluster_centroid.y();
    		_cluster_centroid_ROSMsg.point.z = _cluster_centroid.z();
 
-   		if(DIST(cluster_centroid,plane_centroid) < 0.3 && _cluster_centroid.z() > _plane_centroid.z())
+   		if(DIST(cluster_centroid,plane_centroid) < 0.6 && _cluster_centroid.z() > _plane_centroid.z())
    		{
    			doro_msgs::Cluster __cluster;
    			__cluster.centroid = _cluster_centroid_ROSMsg;
-
    			// Push cluster dimentions. Viewed width, breadth and height
    			__cluster.cluster_size = cluster_dims;
-
    			// Push colors
    			__cluster.color.push_back(mean_r);
    			__cluster.color.push_back(mean_g);
    			__cluster.color.push_back(mean_b);
-
-   			// Push window
-   			__cluster.window.push_back(min_x);
-   			__cluster.window.push_back(min_y);
-   			__cluster.window.push_back(max_x);
-   			__cluster.window.push_back(max_y);
-   			__cluster.x = ourx;
-   			__cluster.y = oury;
    			__clusters.clusters.push_back (__cluster);
    			j++;
    		}
