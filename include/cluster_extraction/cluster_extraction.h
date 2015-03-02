@@ -142,7 +142,7 @@ protected:
 	/**
 	 * Compute approximate dimentions of the objects seen.
 	 */
-	std::vector <double> getClusterDimensions(const pcl::PointCloud<PoinT>::ConstPtr& input_cluster, tf::StampedTransform& base_link_to_openni_transform);
+	std::vector <double> getClusterDimensions(const pcl::PointCloud<PoinT>::ConstPtr& input_cluster, tf::StampedTransform& base_link_to_openni_transform, geometry_msgs::Point& a, geometry_msgs::Point& b);
 
 	/**
 	 * Callback for the point cloud data.

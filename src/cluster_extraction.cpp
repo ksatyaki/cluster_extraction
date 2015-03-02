@@ -313,7 +313,8 @@ void ClusterExtraction::processCloud(float plane_tolerance)
 
    		}
 
-   		std::vector <double> cluster_dims = getClusterDimensions(cloud_cluster, base_link_to_openni);
+   		geometry_msgs::Point a, b;
+   		std::vector <double> cluster_dims = getClusterDimensions(cloud_cluster, base_link_to_openni, a, b);
 
    		mean_r = (uint8_t) (color_r / cloud_cluster->points.size ());
    		mean_g = (uint8_t) (color_g / cloud_cluster->points.size ());
@@ -363,7 +364,7 @@ void ClusterExtraction::processCloud(float plane_tolerance)
 
 }
 
-std::vector <double> ClusterExtraction::getClusterDimensions(const pcl::PointCloud<PoinT>::ConstPtr& input_cluster, tf::StampedTransform& base_link_to_openni_transform)
+std::vector <double> ClusterExtraction::getClusterDimensions(const pcl::PointCloud<PoinT>::ConstPtr& input_cluster, tf::StampedTransform& base_link_to_openni_transform, geometry_msgs::Point& a, geometry_msgs::Point& b)
 {
 	pcl::PointCloud <PoinT> transformed_cloud;
 
@@ -399,6 +400,9 @@ std::vector <double> ClusterExtraction::getClusterDimensions(const pcl::PointClo
 		if(pt.z < min_Z)
 			min_Z = pt.z;
 	}
+
+	b.x = min_X; b.y = min_Y; b.z = min_Z;
+	a.x = max_X; a.y = max_Y, a.z = max_Z;
 
 	std::vector <double> dims;
 	// Width first.
