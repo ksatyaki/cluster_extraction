@@ -345,6 +345,8 @@ void ClusterExtraction::processCloud(float plane_tolerance)
    			__cluster.centroid = _cluster_centroid_ROSMsg;
    			// Push cluster dimentions. Viewed width, breadth and height
    			__cluster.cluster_size = cluster_dims;
+   			__cluster.a = a;
+   			__cluster.b = b;
    			// Push colors
    			__cluster.color.push_back(mean_r);
    			__cluster.color.push_back(mean_g);
