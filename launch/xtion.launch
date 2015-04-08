@@ -1,3 +1,4 @@
+<?xml version="1.0" ?>
 <launch>
 	<include file="$(find openni_launch)/launch/openni.launch" >
 		<arg name="camera" default="xtion_camera" />
@@ -6,5 +7,7 @@
 		<arg name="depth_processing" value="true" />
 	</include>
 	
-	<node name="cluster_extraction_nodelet" pkg="nodelet" type="nodelet" args="load cluster_extraction/ClusterExtraction /xtion_camera/xtion_camera_nodelet_manager"/>	
+	<node name="cluster_extraction_nodelet" pkg="nodelet" type="nodelet" args="load cluster_extraction/ClusterExtraction /xtion_camera/xtion_camera_nodelet_manager">
+	  <remap from="points" to="xtion_camera/depth/points" />
+	</node>
 </launch>	

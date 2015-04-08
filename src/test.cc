@@ -1,13 +1,14 @@
-#include <pcl_ros/point_cloud.h>
+#include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 
-
+#include <boost/shared_ptr.hpp>
+#include <doro_msgs/Cluster.h>
 #include <iostream>
 
 int main()
 {
-	pcl::PointCloud <pcl::PointXYZ> pcloud;
-
+	boost::shared_ptr <int> ssk;
+	
 	for(int i = 0; i < 20; i++)
 	{
 		pcl::PointXYZ pt;

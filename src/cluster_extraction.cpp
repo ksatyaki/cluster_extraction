@@ -48,7 +48,7 @@ void ClusterExtraction::onInit()
 
 	table_cloud_pub = nh_.advertise<sensor_msgs::PointCloud2> ("/plane_cloud", 1);
 
-	cloud_sub = nh_.subscribe("/xtion_camera/depth_registered/points", 3, &ClusterExtraction::cloudCallback, this);
+	cloud_sub = nh_.subscribe("points", 3, &ClusterExtraction::cloudCallback, this);
 
 	//table_coeffs_pub = nh.advertise<pcl_msgs::ModelCoefficients> ("/table_coeffs", 1);
 
@@ -120,7 +120,6 @@ void ClusterExtraction::processCloud(float plane_tolerance)
 	vg_filter.filter (*cloud_filtered);
 
 	_cloud = cloud_filtered;
-
 
 	/**********************************************
 	 * NEW BULL
