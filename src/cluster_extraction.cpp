@@ -31,7 +31,7 @@ ClusterExtraction::~ClusterExtraction()
 
 	if(!cloud_sub.getTopic().empty())
 	{
-		ROS_INFO("Un-subscribing to \'/xtion_camera/depth_registered/points\'...");
+		ROS_INFO("Un-subscribing to \'/xtion_camera/depth/points\'...");
 		cloud_sub.shutdown();
 	}
 }
@@ -48,7 +48,7 @@ void ClusterExtraction::onInit()
 
 	table_cloud_pub = nh_.advertise<sensor_msgs::PointCloud2> ("/plane_cloud", 1);
 
-	cloud_sub = nh_.subscribe("points", 3, &ClusterExtraction::cloudCallback, this);
+	cloud_sub = nh_.subscribe("/xtion_camera/depth/points", 3, &ClusterExtraction::cloudCallback, this);
 
 	//table_coeffs_pub = nh.advertise<pcl_msgs::ModelCoefficients> ("/table_coeffs", 1);
 
@@ -296,6 +296,8 @@ void ClusterExtraction::processCloud(float plane_tolerance)
    	{
    		pcl::PointCloud<PoinT>::Ptr cloud_cluster (new pcl::PointCloud<PoinT>);
 
+		cloud_cluster->header.frame_id = cloud->header.frame_id;
+
    		long int color_r, color_g, color_b;
    		uint8_t mean_r, mean_g, mean_b;
 
@@ -313,7 +315,7 @@ void ClusterExtraction::processCloud(float plane_tolerance)
    		}
 
    		geometry_msgs::Point a, b;
-   		std::vector <double> cluster_dims = getClusterDimensions(cloud_cluster, base_link_to_openni, a, b);
+   		std::vector <double> cluster_dims = getClusterDimensions(cloud_cluster, a, b);
 
    		mean_r = (uint8_t) (color_r / cloud_cluster->points.size ());
    		mean_g = (uint8_t) (color_g / cloud_cluster->points.size ());
@@ -365,14 +367,27 @@ void ClusterExtraction::processCloud(float plane_tolerance)
 
 }
 
-std::vector <double> ClusterExtraction::getClusterDimensions(const pcl::PointCloud<PoinT>::ConstPtr& input_cluster, tf::StampedTransform& base_link_to_openni_transform, geometry_msgs::Point& a, geometry_msgs::Point& b)
+std::vector <double> ClusterExtraction::getClusterDimensions(const pcl::PointCloud<PoinT>::ConstPtr& input_cluster, geometry_msgs::Point& a, geometry_msgs::Point& b)
 {
+        tf::StampedTransform ptu_t_m_link_to_openni;
+	
+	try
+	{
+		tf_listener->waitForTransform("ptu_tilt_motor_link", input_cluster->header.frame_id, ros::Time(0), ros::Duration(1));
+		//tf_listener->transformPoint("base_link", plane_normal, _plane_normal);
+		tf_listener->lookupTransform("ptu_tilt_motor_link", input_cluster->header.frame_id, ros::Time(0), ptu_t_m_link_to_openni);
+	}
+	catch(tf::TransformException& ex)
+	{
+	  	ROS_INFO("COCKED UP POINT INFO! Why: %s", ex.what());
+	}
+
 	pcl::PointCloud <PoinT> transformed_cloud;
 
 	BOOST_FOREACH(const PoinT& pt, input_cluster->points)
 	{
 		tf::Vector3 _pt_(pt.x, pt.y, pt.z);
-		tf::Vector3 _pt_transformed_ = base_link_to_openni_transform*_pt_;
+		tf::Vector3 _pt_transformed_ = ptu_t_m_link_to_openni*_pt_;
 		PoinT thisPoint;
 		thisPoint.x = _pt_transformed_.x();
 		thisPoint.y = _pt_transformed_.y();
@@ -381,7 +396,7 @@ std::vector <double> ClusterExtraction::getClusterDimensions(const pcl::PointClo
 	}
 
 	// Transformed cloud is now w.r.t. base_link frame.
-	transformed_cloud.header.frame_id = "base_link";
+	transformed_cloud.header.frame_id = "ptu_tilt_motor_link";
 
 	double min_X = transformed_cloud.points[0].x, min_Y = transformed_cloud.points[0].y, min_Z = transformed_cloud.points[0].z,
 		   max_X = transformed_cloud.points[0].x, max_Y = transformed_cloud.points[0].y, max_Z = transformed_cloud.points[0].z;
