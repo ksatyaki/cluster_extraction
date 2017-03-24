@@ -5,165 +5,123 @@
  *      Author: ace
  */
 
+#pragma once
 
-#ifndef CLUSTER_EXTRACTION_H_
-#define CLUSTER_EXTRACTION_H_
+#include <thread>
 
-#include <ros/ros.h>
 #include <nodelet/nodelet.h>
-#include <sensor_msgs/PointCloud2.h>
 #include <pcl_ros/point_cloud.h>
+#include <ros/ros.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <tf/transform_listener.h>
 
-#include <pcl/conversions.h>
 #include <pcl/ModelCoefficients.h>
+#include <pcl/conversions.h>
 #include <pcl/point_types.h>
 
+#include <pcl/common/centroid.h>
+#include <pcl/features/normal_3d.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/voxel_grid.h>
-#include <pcl/features/normal_3d.h>
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/sample_consensus/model_types.h>
-#include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_clusters.h>
-#include <pcl/common/centroid.h>
+#include <pcl/segmentation/sac_segmentation.h>
 
-#include <doro_msgs/ClusterArray.h>
+#include <cluster_extraction/ClusterArray.h>
 
-#define DIST(A, B) sqrt ( ((A.x()-B.x())*(A.x()-B.x())) + ((A.y()-B.y())*(A.y()-B.y())) + ((A.z()-B.z())*(A.z()-B.z())) )
+#define DIST(A, B)                           \
+  sqrt(((A.x() - B.x()) * (A.x() - B.x())) + \
+       ((A.y() - B.y()) * (A.y() - B.y())) + \
+       ((A.z() - B.z()) * (A.z() - B.z())))
 
 typedef pcl::PointXYZRGB PoinT;
 
-namespace cluster_extraction
-{
-
-union d_in_f
-{
-	double value;
-	int ind[2];
-};
+namespace cluster_extraction {
 
 /**
  * The class for cluster extraction nodelet.
  * This exploits zero-copy passing of PointCloud data.
  * This nodelet is loaded into the /xtion_camera/xtion_camera_nodelet_manager.
  */
-class ClusterExtraction: public nodelet::Nodelet
-{
-protected:
+class ClusterExtraction : public nodelet::Nodelet {
+ protected:
+  /**
+   * A variable to hold the subscription state.
+   */
+  bool subscribed_;
 
-	/**
-	 * A variable to hold the subscription state.
-	 */
-	bool subscribed_;
+  /**
+   * A nodehandle for this class.
+   */
+  ros::NodeHandle nh_;
 
-	/**
-	 * A nodehandle for this class.
-	 */
-	ros::NodeHandle nh_;
+  /**
+   * A Listener for transforms.
+   */
+  std::shared_ptr<tf::TransformListener> tf_listener;
 
-	/**
-	 * Associate this to the private node handle;
-	 */
-	ros::CallbackQueue q_;
+  /**
+   * ROS Publisher that publishes the centroid and size of clusters.
+   */
+  ros::Publisher clusters_pub;
 
-	/**
-	 * A Listener for transforms.
-	 */
-	tf::TransformListener *tf_listener;
+  /**
+   * ROS Subscriber for the point cloud.
+   */
+  ros::Subscriber cloud_sub;
 
-	/**
-	 * Time stamp for the latest data.
-	 */
-	ros::Time stamp_;
+  /**
+   * A templated point cloud type to hold the data.
+   */
+  sensor_msgs::PointCloud2ConstPtr pcl_data;
 
-	/**
-	 * ROS Publisher for publishing the points message.
-	 */
-	ros::Publisher centroid_pub;
+  /**
+   * A thread id for the cluster_extraction thread.
+   */
+  std::thread c_e_thread_id_;
 
-	/**
-	 * ROS Publisher for the table centroid.
-	 */
-	ros::Publisher table_position_pub;
+  /**
+   * The thread where we do the polling.
+   */
+  void clusterExtractionThread();
 
-	/**
-	 * ROS Publisher for the model coefficients of the table.
-	 */
-	//ros::Publisher table_coeffs_pub;
+ public:
+  ClusterExtraction();
+  virtual ~ClusterExtraction();
 
-	/**
-	 * ROS Publisher that publishes the centroid and size of clusters.
-	 */
-	ros::Publisher clusters_pub;
+  /**
+   * The overloaded onInit() method. This is called when the nodelet is loaded.
+   */
+  void onInit();
 
-	/**
-	 * ROS Subscriber for the point cloud.
-	 */
-	ros::Subscriber cloud_sub;
-	
-	/** 
-	 * ROS Publisher for the filtered cloud to be used by Moveit.
-	 */
-	 ros::Publisher filtered_cloud_pub;
+ protected:
+  /**
+   * Compute approximate dimentions of the objects seen.
+   */
+  std::vector<double> computeClusterDimensions(
+      const pcl::PointCloud<PoinT>::ConstPtr& input_cluster,
+      geometry_msgs::Point& a, geometry_msgs::Point& b);
 
-	 /**
-	  * Visualize the table.
-	  */
-	 ros::Publisher table_cloud_pub;
+  /**
+   * Callback for the point cloud data.
+   */
+  void cloudCallback(const sensor_msgs::PointCloud2ConstPtr& _cloud);
 
-	 /**
-	  * A templated point cloud type to hold the data.
-	  */
-	 //pcl::PointCloud<PoinT>::Ptr
-	 sensor_msgs::PointCloud2ConstPtr pcl_data;
+  /**
+   * The function where the point cloud is processed.
+   */
+  void processCloud(float plane_tolerance);
 
-	 /**
-	  * A thread id for the cluster_extraction thread.
-	  */
-	 pthread_t c_e_thread_id_;
+  /**
+   * Return the number of planes detected.
+   */
+  int getPlanes(const pcl::PointCloud<PoinT>::ConstPtr& _cloud);
 
-	 /**
-	  * The thread where we do the polling.
-	  */
-	 static void *clusterExtractionThread(void *_this_);
-
-public:
-	ClusterExtraction();
-	virtual ~ClusterExtraction();
-
-	/**
-	 * The overloaded onInit() method. This is called when the nodelet is loaded.
-	 */
-	void onInit();
-
-protected:
-	/**
-	 * Compute approximate dimentions of the objects seen.
-	 */
-	std::vector <double> getClusterDimensions(const pcl::PointCloud<PoinT>::ConstPtr& input_cluster, geometry_msgs::Point& a, geometry_msgs::Point& b);
-
-	/**
-	 * Callback for the point cloud data.
-	 */
-	void cloudCallback(const sensor_msgs::PointCloud2ConstPtr& _cloud);
-
-	/**
-	 * The function where the point cloud is processed.
-	 */
-	void processCloud(float plane_tolerance);
-
-	/**
-	 * Return the number of planes detected.
-	 */
-	int getPlanes(const pcl::PointCloud<PoinT>::ConstPtr& _cloud);
-
-	/**
-	 * Return the number of cylinders detected.
-	 */
-	int getCylinders(const pcl::PointCloud<PoinT>::ConstPtr& _cloud);
-
+  /**
+   * Return the number of cylinders detected.
+   */
+  int getCylinders(const pcl::PointCloud<PoinT>::ConstPtr& _cloud);
 };
-} // namespace cluster_extraction
-#endif /* CLUSTER_EXTRACTION_H_ */
+}  // namespace cluster_extraction
